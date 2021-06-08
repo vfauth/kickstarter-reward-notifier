@@ -1,4 +1,4 @@
-module git.fauth.eu/kickstarter-reward-notifier
+module github.com/vfauth/kickstarter-reward-notifier
 
 go 1.16
 
