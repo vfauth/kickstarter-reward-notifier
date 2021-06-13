@@ -31,6 +31,7 @@ import (
 type Settings struct {
 	url      string
 	interval time.Duration
+	quiet    bool
 	watch    map[int]*Reward
 }
 
@@ -126,6 +127,7 @@ func parseArgs() {
 	flag.IntSliceP("rewards", "r", []int{}, "Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency. If multiple limited rewards share the same price, all are watched. Ignored if --all is set.")
 	flag.BoolP("all", "a", false, "If set, watch all unavailable limited rewards.")
 	flag.DurationVarP(&settings.interval, "interval", "i", time.Minute, "Interval between checks")
+	flag.BoolVarP(&settings.quiet, "quiet", "q", false, "Quiet mode.")
 	help := *flag.BoolP("help", "h", false, "Display this help.")
 	flag.CommandLine.SortFlags = false
 	flag.Usage = func() {
@@ -226,14 +228,19 @@ func main() {
 	for {
 		time.Sleep(settings.interval)
 		getProjectData()
+		found := false
 		for _, r := range settings.watch {
 			if r.available > 0 {
-				fmt.Printf(`%s: %d/%d of reward "%s" available!\n`,
+				found = true
+				fmt.Printf(`\n%s: %d/%d of reward "%s" available!\n`,
 					time.Now().Format(time.Kitchen),
 					r.available,
 					r.limit,
 					r.title_with_price)
 			}
+		}
+		if !found && !settings.quiet {
+			fmt.Print(".")
 		}
 	}
 }
