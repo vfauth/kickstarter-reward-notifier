@@ -8,6 +8,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
 */
 
+// Get notified when limited pledges on Kickstarter are available
 package main
 
 import (
@@ -28,6 +29,13 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+/* Structure storing the script parameters.
+   Fields:
+   - url (string): Project description URL
+   - interval (time.Duration): Interval between polling
+   - quiet (bool): Quiet mode
+   - watch (map[int]*Reward): Map of rewards to watch, indexed by their ID
+*/
 type Settings struct {
 	url      string
 	interval time.Duration
@@ -35,6 +43,13 @@ type Settings struct {
 	watch    map[int]*Reward
 }
 
+/* Structure storing the project details.
+   Fields:
+   - name (string): Project name
+   - rewards (map[int]*Reward): Map of all limited rewards, indexed by their ID
+   - currency_symbol (string): The symbol representing the project currency
+   - initialized (bool): Whether that project immutable data has already been obtained
+*/
 type Project struct {
 	name            string
 	rewards         map[int]*Reward
@@ -42,6 +57,15 @@ type Project struct {
 	initialized     bool
 }
 
+/* Structure storing the details about a specific reward.
+   Fields:
+   - id (int): Kickstarter ID of this reward
+   - title (string): Reward name
+   - title_with_price (string): Reward name including its price
+   - price (int): Reward price in the project original currency
+   - available (int): Remaining number of this reward
+   - limit (int): Total quantity of this reward
+*/
 type Reward struct {
 	id               int
 	title            string
@@ -51,44 +75,14 @@ type Reward struct {
 	limit            int
 }
 
-// Some global variables
+// Global Settings structure containing the script parameters
 var settings Settings
+
+// Global Project structure containing the project details
 var project Project
 
-func getProjectJSON() map[string]interface{} {
-	// Download the project description page and extract its data
-	res, err := http.Get(settings.url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Fatalf("Could not get the project description, got HTTP response %d: \"%s\"", res.StatusCode, res.Status)
-	}
-
-	// Load the HTML document
-	description, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Parse the HTML and extract the JSON describing the project
-	jsonRegexp := regexp.MustCompile(`window\.current_project\s*=\s*"(\{.*\})"`)
-	var projectDetails map[string]interface{}
-	description.Find("script").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		match := jsonRegexp.FindStringSubmatch(s.Text())
-		if match != nil {
-			json.Unmarshal([]byte(html.UnescapeString(match[1])), &projectDetails)
-			// Exit the loop
-			return false
-		}
-		return true
-	})
-	return projectDetails
-}
-
+// Obtain the data about the project and store it in the `project` global variable
 func getProjectData() {
-	// Extract project data from the JSON
 	data := getProjectJSON()
 	// The first time, get immutable data
 	if !project.initialized {
@@ -122,6 +116,39 @@ func getProjectData() {
 	}
 }
 
+// Download the project description page and return the unmarshalled JSON object containing the project data
+func getProjectJSON() map[string]interface{} {
+	res, err := http.Get(settings.url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("Could not get the project description, got HTTP response %d: \"%s\"", res.StatusCode, res.Status)
+	}
+
+	// Load the HTML document
+	description, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Parse the HTML and extract the JSON describing the project
+	jsonRegexp := regexp.MustCompile(`window\.current_project\s*=\s*"(\{.*\})"`)
+	var projectDetails map[string]interface{}
+	description.Find("script").EachWithBreak(func(i int, s *goquery.Selection) bool {
+		match := jsonRegexp.FindStringSubmatch(s.Text())
+		if match != nil {
+			json.Unmarshal([]byte(html.UnescapeString(match[1])), &projectDetails)
+			// Exit the loop
+			return false
+		}
+		return true
+	})
+	return projectDetails
+}
+
+// Parse flags and store the results in the `settings` global variable
 func parseArgs() {
 	// Parse flags
 	flag.IntSliceP("rewards", "r", []int{}, "Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency. If multiple limited rewards share the same price, all are watched. Ignored if --all is set.")
@@ -160,8 +187,8 @@ func parseArgs() {
 	}
 }
 
+// Determine the rewards to watch
 func registerWatchedRewards() {
-	// List the rewards to watch
 	if len(project.rewards) == 0 {
 		fmt.Println("All of this project rewards are currently available.")
 		os.Exit(0)
@@ -187,8 +214,10 @@ func registerWatchedRewards() {
 	}
 }
 
+// Prompt the user to interactively choose which limited rewards should be watched
 func askRewardsToWatch(rewards []Reward) {
 	i := 0
+	// Map the prompt index to the reward ID
 	rewardIndex := map[int]*Reward{}
 	choices := []string{}
 	for _, reward := range project.rewards {
@@ -209,8 +238,8 @@ func askRewardsToWatch(rewards []Reward) {
 	}
 }
 
+// Return a slice containing the IDs of all rewards at the specified price
 func findRewardsByPrice(price int) []int {
-	// Return a slice containing the IDs of all rewards at the specified price
 	rewards := []int{}
 	for i, r := range project.rewards {
 		if r.price == price {
@@ -220,12 +249,15 @@ func findRewardsByPrice(price int) []int {
 	return rewards
 }
 
+//  Script entrypoint
 func main() {
 	parseArgs()
 	// Get the project data and rewards list
 	getProjectData()
 	registerWatchedRewards()
 	for {
+		fmt.Println(settings)
+		fmt.Println(project)
 		time.Sleep(settings.interval)
 		getProjectData()
 		found := false
