@@ -6,7 +6,7 @@ This is a simple Go script useful to watch a Kickstarter project and be notified
 
 The script can interactively ask for the rewards to monitor, or you can use command-line arguments:
 
-```
+```text
 kickstarter-reward-notifier [OPTION] PROJECT_URL
   -r, --rewards ints        Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency.
                             If multiple limited rewards share the same price, all are watched. Ignored if --all is set.
