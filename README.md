@@ -1,5 +1,7 @@
 # kickstarter-reward-notifier
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/vfauth/kickstarter-reward-notifier.svg)](https://pkg.go.dev/github.com/vfauth/kickstarter-reward-notifier)
+
 This is a simple Go script useful to watch a Kickstarter project and be notified when specified limited rewards are available.
 
 ## Usage
