@@ -124,7 +124,14 @@ func getProjectJSON() map[string]interface{} {
 	description.Find("script").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		match := jsonRegexp.FindStringSubmatch(s.Text())
 		if match != nil {
-			json.Unmarshal([]byte(html.UnescapeString(match[1])), &projectDetails)
+			unescapedJSON := match[1]
+			// Required because escaped double quotes in strings are badly handled by html.UnescapeString
+			unescapedJSON = str.ReplaceAll(unescapedJSON, `\\&quot`, `\"`)
+			unescapedJSON = html.UnescapeString(unescapedJSON)
+			err := json.Unmarshal([]byte(unescapedJSON), &projectDetails)
+			if err != nil {
+				log.Fatalf("Failed to decode JSON data, got: %s", err)
+			}
 			// Exit the loop
 			return false
 		}
