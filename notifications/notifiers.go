@@ -102,9 +102,9 @@ func TestNotifiers() error {
 		}
 	}
 	if len(failures) != 0 {
-		errorMessage := fmt.Sprintf("Failure while testing notifiers: %d/%d notifiers returned an error.", len(failures), enabled)
+		errorMessage := fmt.Sprintf("Failure while testing notifiers: %d/%d notifiers returned an error.\n", len(failures), enabled)
 		for _, f := range failures {
-			errorMessage += f.Error()
+			errorMessage += f.Error() + "\n"
 		}
 		return errors.New(errorMessage)
 	} else {
