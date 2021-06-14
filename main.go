@@ -260,7 +260,7 @@ func registerWatchedRewards() {
 	// Display list of watched rewards
 	summary := fmt.Sprintf("%d rewards watched:\n", len(settings.watch))
 	for _, w := range settings.watch {
-		summary += fmt.Sprintf("- %s\n", w.title_with_price)
+		summary += fmt.Sprintf("- %s: %d rewards\n", w.title_with_price, w.limit)
 	}
 	fmt.Print(summary)
 }
