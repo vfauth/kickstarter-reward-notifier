@@ -16,7 +16,7 @@ Usage: kickstarter-reward-notifier [OPTION] PROJECT_URL
   -q, --quiet               Quiet mode
   -t, --test-notification   Send a test notification at script start, fail if any configured notifier fails
   -h, --help                Display this help
-      --tg-token string     Telegram notifier: bot authentication token
+      --tg-token string     Telegram notifier: Bot authentication token
       --tg-user-id int      Telegram notifier: User ID of the user to notify
 ```
 

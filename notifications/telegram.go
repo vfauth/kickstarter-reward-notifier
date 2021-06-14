@@ -30,7 +30,7 @@ func TelegramInit(notifier *Notifier) Telegram {
 		"token": {
 			Long:      "tg-token",
 			Short:     "",
-			Help:      "Telegram notifier: bot authentication token",
+			Help:      "Telegram notifier: Bot authentication token",
 			ValueType: "string",
 		},
 		"userID": {
