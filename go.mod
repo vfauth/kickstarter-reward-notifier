@@ -6,4 +6,5 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.2.12
 	github.com/PuerkitoBio/goquery v1.6.1
 	github.com/spf13/pflag v1.0.5
+	gopkg.in/tucnak/telebot.v2 v2.3.5
 )

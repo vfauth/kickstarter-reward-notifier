@@ -9,15 +9,25 @@ This is a simple Go script useful to watch a Kickstarter project and be notified
 The script can interactively ask for the rewards to monitor, or you can use command-line arguments:
 
 ```text
-kickstarter-reward-notifier [OPTION] PROJECT_URL
-  -r, --rewards ints        Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency.
-                            If multiple limited rewards share the same price, all are watched. Ignored if --all is set.
-  -a, --all                 If set, watch all unavailable limited rewards.
+Usage: kickstarter-reward-notifier [OPTION] PROJECT_URL
+  -r, --rewards ints        Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency. If multiple limited rewards share the same price, all are watched. Ignored if --all is set
+  -a, --all                 If set, watch all unavailable limited rewards
   -i, --interval duration   Interval between checks (default 1m0s)
-  -q, --quiet               Quiet mode.
-  -h, --help                Display this help.
+  -q, --quiet               Quiet mode
+  -t, --test-notification   Send a test notification at script start, fail if any configured notifier fails
+  -h, --help                Display this help
+      --tg-token string     Telegram notifier: bot authentication token
+      --tg-user-id int      Telegram notifier: User ID of the user to notify
 ```
 
 ## Notifications
 
-For now, it only outputs to stdout when watched rewards are available. Telegram notifications are in the work.
+The script supports sending notifications when a watched reward is available.
+:warning: For now, a notification will be sent each time Kickstarter is polled and as long as the reward is available.
+
+### Telegram
+
+To send notifications with Telegram:
+
+- create a bot using the BotFather ([see the official documentation](https://core.telegram.org/bots#6-botfather)) and pass the generated token using the `--tg-token` parameter
+- get your user ID using by sending a message to [@userinfobot](https://telegram.me/userinfobot) and pass it using the `--tg-user-id` parameter

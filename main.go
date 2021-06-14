@@ -8,7 +8,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
 */
 
-// Get notified when limited pledges on Kickstarter are available
+// Get notified when limited rewards on Kickstarter are available
 package main
 
 import (
@@ -25,54 +25,36 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/vfauth/kickstarter-reward-notifier/notifications"
 
-	flag "github.com/spf13/pflag"
+	"github.com/spf13/pflag"
 )
 
-/* Structure storing the script parameters.
-   Fields:
-   - url (string): Project description URL
-   - interval (time.Duration): Interval between polling
-   - quiet (bool): Quiet mode
-   - watch (map[int]*Reward): Map of rewards to watch, indexed by their ID
-*/
+// Structure storing the script parameters
 type Settings struct {
-	url      string
-	interval time.Duration
-	quiet    bool
-	watch    map[int]*Reward
+	url       string                    // Project description URL
+	interval  time.Duration             // Interval between polling
+	quiet     bool                      // Quiet mode
+	watch     map[int]*Reward           // Map of rewards to watch, indexed by their ID
+	notifiers []*notifications.Notifier // Slice of all the available notifiers
 }
 
-/* Structure storing the project details.
-   Fields:
-   - name (string): Project name
-   - rewards (map[int]*Reward): Map of all limited rewards, indexed by their ID
-   - currency_symbol (string): The symbol representing the project currency
-   - initialized (bool): Whether that project immutable data has already been obtained
-*/
+// Structure storing the project details
 type Project struct {
-	name            string
-	rewards         map[int]*Reward
-	currency_symbol string
-	initialized     bool
+	name            string          // Project name
+	rewards         map[int]*Reward // Map of all limited rewards, indexed by their ID
+	currency_symbol string          // The symbol representing the project currency
+	initialized     bool            // Whether that project immutable data has already been obtained
 }
 
-/* Structure storing the details about a specific reward.
-   Fields:
-   - id (int): Kickstarter ID of this reward
-   - title (string): Reward name
-   - title_with_price (string): Reward name including its price
-   - price (int): Reward price in the project original currency
-   - available (int): Remaining number of this reward
-   - limit (int): Total quantity of this reward
-*/
+// Structure storing the details about a specific reward
 type Reward struct {
-	id               int
-	title            string
-	title_with_price string
-	price            int
-	available        int
-	limit            int
+	id               int    // Kickstarter ID of this reward
+	title            string // Reward name
+	title_with_price string // Reward name including its price
+	price            int    // Reward price in the project original currency
+	available        int    // Remaining number of this reward
+	limit            int    // Total quantity of this reward
 }
 
 // Global Settings structure containing the script parameters
@@ -124,7 +106,10 @@ func getProjectJSON() map[string]interface{} {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatalf("Could not get the project description, got HTTP response %d: \"%s\"", res.StatusCode, res.Status)
+		log.Fatalf(
+			"Could not get the project description, got HTTP response %d: \"%s\"",
+			res.StatusCode,
+			res.Status)
 	}
 
 	// Load the HTML document
@@ -150,34 +135,83 @@ func getProjectJSON() map[string]interface{} {
 
 // Parse flags and store the results in the `settings` global variable
 func parseArgs() {
-	// Parse flags
-	flag.IntSliceP("rewards", "r", []int{}, "Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency. If multiple limited rewards share the same price, all are watched. Ignored if --all is set.")
-	flag.BoolP("all", "a", false, "If set, watch all unavailable limited rewards.")
-	flag.DurationVarP(&settings.interval, "interval", "i", time.Minute, "Interval between checks")
-	flag.BoolVarP(&settings.quiet, "quiet", "q", false, "Quiet mode.")
-	help := *flag.BoolP("help", "h", false, "Display this help.")
-	flag.CommandLine.SortFlags = false
-	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, "Usage: kickstarter-reward-notifier [OPTION] PROJECT_URL\n")
-		flag.PrintDefaults()
+	// Define flags
+	pflag.IntSliceP("rewards", "r", []int{}, "Comma-separated list of unavailable limited rewards to watch, identified by their price in the project's original currency. If multiple limited rewards share the same price, all are watched. Ignored if --all is set")
+	pflag.BoolP("all", "a", false, "If set, watch all unavailable limited rewards")
+	pflag.DurationVarP(&settings.interval, "interval", "i", time.Minute, "Interval between checks")
+	pflag.BoolVarP(&settings.quiet, "quiet", "q", false, "Quiet mode")
+	notificationTest := pflag.BoolP("test-notification", "t", false, "Send a test notification at script start, fail if any configured notifier fails")
+	help := pflag.BoolP("help", "h", false, "Display this help")
+
+	// Setup the notifiers flags
+	for _, notifier := range settings.notifiers {
+		for _, flag := range notifier.Flags {
+			switch flag.ValueType {
+			case "string":
+				pflag.StringP(flag.Long, "", "", flag.Help)
+			case "int":
+				pflag.IntP(flag.Long, "", 0, flag.Help)
+			case "bool":
+				pflag.BoolP(flag.Long, "", false, flag.Help)
+			default:
+				log.Fatalf(
+					`Error in notifier "%s": "%s" is not supported as a notifier flag type\n`,
+					notifier.Name,
+					flag.ValueType)
+			}
+		}
 	}
-	flag.Parse()
+
+	// Configure and parse the flags
+	pflag.CommandLine.SortFlags = false
+	pflag.Usage = func() {
+		fmt.Printf("Usage: kickstarter-reward-notifier [OPTION] PROJECT_URL\n")
+		pflag.PrintDefaults()
+	}
+	pflag.Parse()
 
 	// Print the help and exit
-	if help {
-		flag.Usage()
+	if *help {
+		pflag.Usage()
 		os.Exit(0)
 	}
 
+	// Get the notifiers flags values
+	for _, notifier := range settings.notifiers {
+		for _, flag := range notifier.Flags {
+			switch flag.ValueType {
+			case "string":
+				flag.Value, _ = pflag.CommandLine.GetString(flag.Long)
+			case "int":
+				flag.Value, _ = pflag.CommandLine.GetInt(flag.Long)
+			case "bool":
+				flag.Value, _ = pflag.CommandLine.GetBool(flag.Long)
+			}
+		}
+	}
+
+	// Test the notifiers
+	if *notificationTest {
+		fmt.Println("Testing the notifications...")
+		err := notifications.TestNotifiers()
+		if err != nil {
+			fmt.Printf("Failure during notification test: %s", err)
+			os.Exit(1)
+		} else {
+			fmt.Println("All configured notifiers passed the test.")
+		}
+	}
+
 	// Get and validate the project URL
-	if len(flag.Args()) != 1 {
-		fmt.Println("Invalid argument.")
-		flag.Usage()
+	if len(pflag.Args()) != 1 {
+		pflag.Usage()
+		fmt.Printf("Invalid argument: there must be a single URL passed as parameter.\n")
 		os.Exit(1)
 	}
-	projectURL, err := url.ParseRequestURI(flag.Arg(0))
+	projectURL, err := url.ParseRequestURI(pflag.Arg(0))
 	if err != nil {
-		log.Fatalf("Project URL not valid: %s", err)
+		fmt.Printf("Project URL not valid: %s", err)
+		os.Exit(1)
 	}
 	projectURL.RawQuery = "" // Remove the query string
 	if str.HasSuffix(projectURL.String(), "/description") {
@@ -194,8 +228,8 @@ func registerWatchedRewards() {
 		os.Exit(0)
 	}
 	settings.watch = map[int]*Reward{}
-	watchAll, _ := flag.CommandLine.GetBool("all")
-	watchList, _ := flag.CommandLine.GetIntSlice("rewards")
+	watchAll, _ := pflag.CommandLine.GetBool("all")
+	watchList, _ := pflag.CommandLine.GetIntSlice("rewards")
 	if watchAll {
 		settings.watch = project.rewards
 	} else if len(watchList) != 0 {
@@ -209,9 +243,19 @@ func registerWatchedRewards() {
 				}
 			}
 		}
-	} else {
+	}
+
+	// Prompt the user if no reward was specified
+	if len(settings.watch) == 0 {
 		askRewardsToWatch([]Reward{})
 	}
+
+	// Display list of watched rewards
+	summary := fmt.Sprintf("%d rewards watched:\n", len(settings.watch))
+	for _, w := range settings.watch {
+		summary += fmt.Sprintf("- %s\n", w.title_with_price)
+	}
+	fmt.Print(summary)
 }
 
 // Prompt the user to interactively choose which limited rewards should be watched
@@ -251,24 +295,25 @@ func findRewardsByPrice(price int) []int {
 
 //  Script entrypoint
 func main() {
+	settings.notifiers = notifications.InitNotifiers()
 	parseArgs()
 	// Get the project data and rewards list
 	getProjectData()
 	registerWatchedRewards()
 	for {
-		fmt.Println(settings)
-		fmt.Println(project)
 		time.Sleep(settings.interval)
 		getProjectData()
 		found := false
 		for _, r := range settings.watch {
 			if r.available > 0 {
 				found = true
-				fmt.Printf(`\n%s: %d/%d of reward "%s" available!\n`,
-					time.Now().Format(time.Kitchen),
+				message := fmt.Sprintf(`%d/%d of reward "%s" available!`,
 					r.available,
 					r.limit,
 					r.title_with_price)
+				notifMessage := fmt.Sprintf(`Alert about Kickstarter project "%s": %s`, project.name, message)
+				log.Printf(`\n%s\n`, message)
+				notifications.SendNotification(notifMessage)
 			}
 		}
 		if !found && !settings.quiet {
