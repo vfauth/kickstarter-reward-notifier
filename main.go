@@ -90,10 +90,17 @@ func getProjectData() {
 	for _, r := range data["rewards"].([]interface{}) {
 		reward := r.(map[string]interface{})
 		_, limited := reward["limit"]
+		id := int(reward["id"].(float64)) // Save the ID of the current reward
 		if limited && reward["remaining"].(float64) == 0 {
-			id := int(reward["id"].(float64))
 			project.rewards[id].available = int(reward["remaining"].(float64))
 			project.rewards[id].limit = int(reward["limit"].(float64))
+		}
+		// Update remaining rewards
+		for _, r := range settings.watch {
+			if r.id == id {
+				project.rewards[id].available = int(reward["remaining"].(float64))
+				project.rewards[id].limit = int(reward["limit"].(float64))
+			}
 		}
 	}
 }
