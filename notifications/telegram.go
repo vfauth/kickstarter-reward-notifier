@@ -59,7 +59,7 @@ func (tg Telegram) Send(message string) error {
 	if tg.isConfigured() {
 		log.Printf("Sending a Telegram notification to user %d", tg.userID())
 		bot, _ := tb.NewBot(tb.Settings{Token: tg.token()})
-		user := &tb.User{ID: tg.userID()}
+		user := &tb.User{ID: int64(tg.userID())}
 		_, err := bot.Send(user, message)
 		if err != nil {
 			log.Printf("ERROR: Failed to send a Telegram notification to user %d, got: %s", tg.userID(), err)

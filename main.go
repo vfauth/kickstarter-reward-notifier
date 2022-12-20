@@ -107,7 +107,10 @@ func getProjectData() {
 
 // Download the project description page and return the unmarshalled JSON object containing the project data
 func getProjectJSON() map[string]interface{} {
-	res, err := http.Get(settings.url)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", settings.url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0")
+	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
